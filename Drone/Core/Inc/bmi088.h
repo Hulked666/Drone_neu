@@ -17,10 +17,10 @@ typedef struct{
 typedef struct{
 	dataStruct_t Accel;
 	dataStruct_t Gyro;
+}IMURAWStruct_t;
 
-	uint32_t TimeStamp;
-}IMUStruct_t;
 
+HAL_StatusTypeDef BMI088_Read_Raw(IMURAWStruct_t *imuData);
 
 
 

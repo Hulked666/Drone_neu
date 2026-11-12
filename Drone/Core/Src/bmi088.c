@@ -20,6 +20,8 @@
 #define GYRO_RNG 0x0F
 #define GYRO_BWP 0x10
 #define GYRO_PWR 0x11
+#define ACC_DATA 0x12
+#define GYRO_DATA 0x02
 
 
 extern I2C_HandleTypeDef hi2c1;
@@ -237,6 +239,62 @@ HAL_StatusTypeDef BMI088_Init(uint8_t accRng, uint8_t accOdr, uint8_t accBwp,uin
 
 	return HAL_OK;
 
+}
+
+HAL_StatusTypeDef ACC_Read_Raw(dataStruct_t *accData){
+	HAL_StatusTypeDef status;
+	uint8_t buff[6];
+	if(accData == NULL){
+		return HAL_ERROR;
+	}
+	status = BMI_ACC_read(ACC_DATA,buff,6);
+	if(status != HAL_OK){
+		return status;
+	}
+	accData->x = (int16_t)(((uint16_t) buff[1] << 8) | (buff[0]));
+	accData->y = (int16_t)(((uint16_t) buff[3] << 8) | (buff[2]));
+	accData->z = (int16_t)(((uint16_t) buff[5] << 8) | (buff[4]));
+	return HAL_OK;
+}
+
+HAL_StatusTypeDef GYRO_Read_Raw(dataStruct_t *gyroData){
+	HAL_StatusTypeDef status;
+	uint8_t buff[6];
+	if(gyroData == NULL){
+		return HAL_ERROR;
+	}
+	status = BMI_GYRO_read(GYRO_DATA, buff,6);
+	if(status != HAL_OK){
+		return status;
+	}
+
+	gyroData->x = (int16_t)(((uint16_t) buff[1] << 8) | (buff[0]));
+	gyroData->y = (int16_t)(((uint16_t) buff[3] << 8) | (buff[2]));
+	gyroData->z = (int16_t)(((uint16_t) buff[5] << 8) | (buff[4]));
+
+	return HAL_OK;
+}
+
+HAL_StatusTypeDef BMI088_Read_Raw(IMURAWStruct_t *imuData){
+	HAL_StatusTypeDef status;
+	dataStruct_t accData;
+	dataStruct_t gyroData;
+	if(imuData == NULL){
+		return HAL_ERROR;
+	}
+	status = ACC_Read_Raw(&accData);
+	if(status != HAL_OK){
+		return status;
+	}
+	status = GYRO_Read_Raw(&gyroData);
+	if(status != HAL_OK){
+		return status;
+	}
+
+	imuData->Accel = accData;
+	imuData->Gyro = gyroData;
+
+	return HAL_OK;
 }
 
 
