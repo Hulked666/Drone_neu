@@ -21,6 +21,7 @@ typedef struct{
 
 
 HAL_StatusTypeDef BMI088_Read_Raw(IMURAWStruct_t *imuData);
+HAL_StatusTypeDef BMI088_Init(uint8_t accRng, uint8_t accOdr, uint8_t accBwp,uint8_t gyrRng, uint8_t gyrBwp);
 
 
 
