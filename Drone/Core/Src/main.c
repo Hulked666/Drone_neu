@@ -22,6 +22,10 @@
 #include "bmm150.h"
 #include "imu.h"
 
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+
 
 
 /* Private includes ----------------------------------------------------------*/
@@ -53,61 +57,43 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-static void IMU_Test_Update(void)
+
+static void BMM150_Test_Update(void)
 {
-    static uint32_t last_imu_us = 0;
-    static uint32_t last_uart_us = 0;
-    static bool first_sample = true;
-    static float accel_x_start_rad = 0.0f;
-    static float accel_y_start_rad = 0.0f;
+    static uint32_t last_uart_ms = 0;
 
-    uint32_t now_us = __HAL_TIM_GET_COUNTER(&htim2);
-
-    if (now_us - last_imu_us < 10000U) {
-        return;
-    }
-    last_imu_us = now_us;
-
-    IMUStruct_t sample;
-    if (IMU_Data(&sample) != HAL_OK) {
+    if ((HAL_GetTick() - last_uart_ms) < 100U) {
         return;
     }
 
-    float gyro_x_rad = IMU_X_Angle(sample.gyr_x, sample.time_stamp);
-    float gyro_y_rad = IMU_Y_Angle(sample.gyr_y, sample.time_stamp);
+    last_uart_ms = HAL_GetTick();
 
-    float accel_x_rad = IMU_Accel_X_Angle(sample.acc_y, sample.acc_z);
-    float accel_y_rad = IMU_Accel_Y_Angle(sample.acc_x, sample.acc_z);
+    MagnetRaw_t magData;
 
-    float filter_x_rad = IMU_X_Filter(&sample);
-    float filter_y_rad = IMU_Y_Filter(&sample);
+    HAL_StatusTypeDef status = BMM150_Raw(&magData);
 
-    if (first_sample) {
-        accel_x_start_rad = accel_x_rad;
-        accel_y_start_rad = accel_y_rad;
-        first_sample = false;
-    }
-
-    if (now_us - last_uart_us < 200000U) {
+    if (status != HAL_OK) {
+        const char *error = "BMM150 read error\r\n";
+        HAL_UART_Transmit(&huart2, (uint8_t *)error,
+                          strlen(error), 100);
         return;
     }
-    last_uart_us = now_us;
 
-    char msg[160];
+    char msg[128];
+
     int len = snprintf(msg, sizeof(msg),
-                       "[rad] X G=%+.3f A=%+.3f F=%+.3f | "
-                       "Y G=%+.3f A=%+.3f F=%+.3f\r\n",
-                       (double)gyro_x_rad,
-                       (double)(accel_x_rad - accel_x_start_rad),
-                       (double)(filter_x_rad - accel_x_start_rad),
-                       (double)gyro_y_rad,
-                       (double)(accel_y_rad - accel_y_start_rad),
-                       (double)(filter_y_rad - accel_y_start_rad));
+        "BMM150 RAW | X=%+6d Y=%+6d Z=%+6d RHALL=%u\r\n",
+        (int)magData.mag_x,
+        (int)magData.mag_y,
+        (int)magData.mag_z,
+        (unsigned int)magData.hall);
 
     if (len > 0 && len < (int)sizeof(msg)) {
-        HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)len, 100);
+        HAL_UART_Transmit(&huart2, (uint8_t *)msg,
+                          (uint16_t)len, 100);
     }
 }
+
 
 /* USER CODE END PV */
 
@@ -161,12 +147,7 @@ int main(void)
   MX_TIM2_Init();
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
-  BMI088_Init(0x01U, 0x0AU, 0x09U, 0x00U, 0x03U);
-  if (HAL_TIM_Base_Start(&htim2) != HAL_OK)
-  {
-      Error_Handler();
-  }
-
+  BMM150_Init(0x28);
 
   /* USER CODE END 2 */
 
@@ -178,9 +159,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  IMU_Test_Update();
+	  BMM150_Test_Update();
 
   /* USER CODE END 3 */
+}
 }
 
 /**

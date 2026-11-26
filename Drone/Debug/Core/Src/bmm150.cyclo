@@ -1,0 +1,7 @@
+../Core/Src/bmm150.c:19:19:read_data	1
+../Core/Src/bmm150.c:25:19:write_data	1
+../Core/Src/bmm150.c:31:19:BMM150_Wakeup	3
+../Core/Src/bmm150.c:50:6:chip_id	3
+../Core/Src/bmm150.c:61:19:BMM150_SetMode	2
+../Core/Src/bmm150.c:70:19:BMM150_Init	6
+../Core/Src/bmm150.c:95:19:BMM150_Raw	5

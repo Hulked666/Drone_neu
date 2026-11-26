@@ -1,9 +1,10 @@
 #include "main.h"
+#include "bmm150.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
-#define DEV_ADDR (0x10 << 1)
+#define DEV_ADDR (0x13 << 1)
 #define CHIP_ID 0x40
 #define RESET_REG 0x4B
 #define MODE_ADDR 0x4C
@@ -11,9 +12,14 @@
 #define FASTER_MODE 0x28
 #define DATA_ADDR_XY 0x42
 #define DATA_ADDR_Z 0x46
+#define FIRST_TRIM 0x5D
+#define SECOND_TRIM 0x62
+#define THIRD_TRIM 0x68
 
 
 extern I2C_HandleTypeDef hi2c2;
+
+static TrimStruct_t trimData;
 
 HAL_StatusTypeDef read_data(uint16_t regAddr, uint8_t *buffer, uint16_t dataSize){
 	HAL_StatusTypeDef status;
@@ -47,8 +53,9 @@ HAL_StatusTypeDef BMM150_Wakeup(void){
 }
 
 bool chip_id(void){
+	HAL_StatusTypeDef status;
 	uint8_t id_value = 0;
-	read_data(CHIP_ID,&id_value,1);
+	status = read_data(CHIP_ID,&id_value,1);
 	if((status != HAL_OK) || (id_value != 0x32)){
 		return false;
 	}
@@ -87,6 +94,11 @@ HAL_StatusTypeDef BMM150_Init(uint8_t mode){
 		return HAL_ERROR;
 	}
 
+	status = BMM150_ReadTrim(&trimData);
+	if(status != HAL_OK){
+		return status;
+	}
+
 	return HAL_OK;
 }
 
@@ -116,5 +128,61 @@ HAL_StatusTypeDef BMM150_Raw(MagnetRaw_t *magData){
 	magData->mag_z = (int16_t)raw_z;
 
 	return HAL_OK;
+}
+
+HAL_StatusTypeDef BMM150_ReadTrim(TrimStruct_t *trimData){
+	HAL_StatusTypeDef status;
+	uint8_t first_trim[2];
+	uint8_t second_trim[4];
+	uint8_t third_trim[10];
+	status = read_data(FIRST_TRIM,first_trim,2);
+	if(status != HAL_OK){
+		return status;
+	}
+	status = read_data(SECOND_TRIM,second_trim,4);
+	if(status != HAL_OK){
+		return status;
+	}
+	status = read_data(THIRD_TRIM,third_trim,10);
+	if(status != HAL_OK){
+		return status;
+	}
+	uint16_t dig_xyz1_raw = (uint16_t)(third_trim[5] << 8) | (third_trim[4]);
+	dig_xyz1_raw &= 0x7FFF;
+
+	trimData->dig_x1 = (int8_t)(first_trim[0]);
+	trimData->dig_y1 = (int8_t)(first_trim[1]);
+	trimData->dig_z4 = (int16_t)(second_trim[1]<<8) | (second_trim[0]);
+	trimData->dig_x2 = (int8_t)(second_trim[2]);
+	trimData->dig_y2 = (int8_t)(second_trim[3]);
+	trimData->dig_z2 = (int16_t)(third_trim[1] << 8) | (third_trim[0]);
+	trimData->dig_z1 = (uint16_t)(third_trim[3] << 8) | (third_trim[2]);
+	trimData->dig_xyz1 = (uint16_t)dig_xyz1_raw;
+	trimData->dig_z3 = (int16_t)(third_trim[7] << 8) | (third_trim[6]);
+	trimData->dig_xy2 = (int8_t)(third_trim[8]);
+	trimData->dig_xy1= (uint8_t)(third_trim[9]);
+
+	return HAL_OK;
+}
+
+HAL_StatusTypeDef BMM150_Compens(MagData_t * compData){
+	if(compData == NULL){
+		return HAL_ERROR;
+	}
+	HAL_StatusTypeDef status;
+	MagnetRaw_t magData;
+	status = BMM150_Raw(&magData);
+	if(status != HAL_OK){
+		return status;
+	}
+
+	if(magData.hall == 0){
+		return HAL_ERROR;
+	}
+
+
+	float hall_corr = (((float)trimData.dig_xyz1 * 16384.0f) / (float)magData.hall) - 16384.0f;
+
+
 }
 
