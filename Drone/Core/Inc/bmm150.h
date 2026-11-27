@@ -34,4 +34,6 @@ typedef struct{
 HAL_StatusTypeDef BMM150_Init(uint8_t mode);
 
 HAL_StatusTypeDef BMM150_Raw(MagnetRaw_t *magData);
+
+HAL_StatusTypeDef BMM150_Compens(MagData_t * compData);
 #endif /* INC_BMM150_H_ */

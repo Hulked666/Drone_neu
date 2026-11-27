@@ -21,6 +21,8 @@ extern I2C_HandleTypeDef hi2c2;
 
 static TrimStruct_t trimData;
 
+HAL_StatusTypeDef BMM150_ReadTrim(TrimStruct_t *trimData);
+
 HAL_StatusTypeDef read_data(uint16_t regAddr, uint8_t *buffer, uint16_t dataSize){
 	HAL_StatusTypeDef status;
 	status = HAL_I2C_Mem_Read(&hi2c2,DEV_ADDR,regAddr,I2C_MEMADD_SIZE_8BIT, buffer,dataSize,100);
@@ -180,9 +182,34 @@ HAL_StatusTypeDef BMM150_Compens(MagData_t * compData){
 		return HAL_ERROR;
 	}
 
+	if(magData.mag_x == -4096){
+		return HAL_ERROR;
+	}
 
+	if(magData.mag_y == -4096){
+		return HAL_ERROR;
+	}
+
+	if(magData.mag_z == -16384){
+		return HAL_ERROR;
+	}
+
+	if((trimData.dig_xyz1 == 0) || (trimData.dig_z1 == 0) || (trimData.dig_z2 == 0)){
+		return HAL_ERROR;
+	}
+
+	float devider = (64.0f*((float)trimData.dig_z2 + (((float)trimData.dig_z1 * (float)magData.hall)/32768.0f)));
+	if(devider == 0.0f){
+		return HAL_ERROR;
+	}
 	float hall_corr = (((float)trimData.dig_xyz1 * 16384.0f) / (float)magData.hall) - 16384.0f;
+	float XY_corr  = ((float)trimData.dig_xy2 *((hall_corr * hall_corr) / 268435456.0f)) + ((float)trimData.dig_xy1*(hall_corr / 16384.0f));
 
+	compData->mag_x = (((float)magData.mag_x *(XY_corr + 256.0f)*((float)trimData.dig_x2 +160.0f)/8192.0f) + (8.0f * (float)trimData.dig_x1)) / 16.0f;
+	compData->mag_y = (((float)magData.mag_y *(XY_corr + 256.0f)*((float)trimData.dig_y2 +160.0f)/8192.0f) + (8.0f * (float)trimData.dig_y1)) / 16.0f;
+	compData->mag_z = (((float)magData.mag_z - (float)trimData.dig_z4) * 131072.0f - (float)trimData.dig_z3 *((float)magData.hall - (float)trimData.dig_xyz1)) / devider ;
+
+	return HAL_OK;
 
 }
 

@@ -58,41 +58,44 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-static void BMM150_Test_Update(void)
+
+static void BMM150_Compens_Test(void)
 {
     static uint32_t last_uart_ms = 0;
 
-    if ((HAL_GetTick() - last_uart_ms) < 100U) {
+    uint32_t now_ms = HAL_GetTick();
+
+    if ((uint32_t)(now_ms - last_uart_ms) < 100U) {
         return;
     }
 
-    last_uart_ms = HAL_GetTick();
+    last_uart_ms = now_ms;
 
-    MagnetRaw_t magData;
+    MagData_t magData;
 
-    HAL_StatusTypeDef status = BMM150_Raw(&magData);
-
-    if (status != HAL_OK) {
-        const char *error = "BMM150 read error\r\n";
-        HAL_UART_Transmit(&huart2, (uint8_t *)error,
-                          strlen(error), 100);
-        return;
-    }
+    HAL_StatusTypeDef status = BMM150_Compens(&magData);
 
     char msg[128];
+    int len;
 
-    int len = snprintf(msg, sizeof(msg),
-        "BMM150 RAW | X=%+6d Y=%+6d Z=%+6d RHALL=%u\r\n",
-        (int)magData.mag_x,
-        (int)magData.mag_y,
-        (int)magData.mag_z,
-        (unsigned int)magData.hall);
+    if (status != HAL_OK) {
+        len = snprintf(msg, sizeof(msg),
+                       "BMM150 COMPENS ERROR | HAL=%d\r\n",
+                       (int)status);
+    } else {
+        len = snprintf(msg, sizeof(msg),
+                       "BMM150 [uT] | X=%+.2f Y=%+.2f Z=%+.2f\r\n",
+                       (double)magData.mag_x,
+                       (double)magData.mag_y,
+                       (double)magData.mag_z);
+    }
 
     if (len > 0 && len < (int)sizeof(msg)) {
         HAL_UART_Transmit(&huart2, (uint8_t *)msg,
                           (uint16_t)len, 100);
     }
 }
+
 
 
 /* USER CODE END PV */
@@ -159,7 +162,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  BMM150_Test_Update();
+	  BMM150_Compens_Test();
 
   /* USER CODE END 3 */
 }
